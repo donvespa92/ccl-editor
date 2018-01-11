@@ -132,14 +132,35 @@ class MainApplication(tk.Frame):
                 self.orig_setup.append(line.rstrip())
         
         object_dict = {'Domain':2,
+                       'Material':2,
                        'Boundary':4,
+                       'Expressions':4,
                        'Domain Interface':4}
         
         for obj in object_dict:
             objects_found = []
-            for line in self.orig_setup:
-                if (obj.upper()+':' in line and re.search('[\s{%s}]' % object_dict[obj],line)):
-                    objects_found.append(line.split(':')[1].lstrip(' ').rstrip(' '))
+            if obj == 'Boundary':
+                for line in self.orig_setup:
+                    if (obj.upper()+':' in line and 
+                        re.search('[\s{%s}]' % object_dict[obj],line) and 
+                        ' Side ' not in line):
+                        objects_found.append(line.split(':')[1].lstrip(' ').rstrip(' '))
+            elif obj == 'Expressions':
+                for idx,line in enumerate(self.orig_setup):
+                    if obj.upper()+':' in line:
+                        temp_data = self.orig_setup[idx:]
+                        break
+                for idx,line in enumerate(temp_data):
+                    if re.search('[\s{%s}]' % object_dict[obj],line) and 'END' in line:
+                        temp_data = temp_data[:idx]
+                        break
+                for line in temp_data:
+                    if ' = ' in line:
+                        objects_found.append(line.split(' = ')[0].lstrip(' ').rstrip(' '))
+            else:
+                for line in self.orig_setup:
+                    if (obj.upper()+':' in line and re.search('[\s{%s}]' % object_dict[obj],line)):
+                        objects_found.append(line.split(':')[1].lstrip(' ').rstrip(' '))
             self.objects[obj] = objects_found
         return
     
