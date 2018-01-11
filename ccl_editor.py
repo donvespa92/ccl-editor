@@ -15,7 +15,20 @@ class MainApplication(tk.Frame):
         self.master = master
         self.master.bind('<Escape>',self.cmd_escape)
         self.master.bind('<Control-f>',self.cmd_search)
-        self.object_types = ['Domain','Boundary','Domain Interface','Expressions','Material']
+        self.object_types = ['Domain',
+                             'Boundary',
+                             'Domain Interface',
+                             'Material',
+                             'Expressions',
+                             'Monitor Point',
+                             ]
+        self.object_dict = {'Domain':2,
+                            'Material':2,
+                            'Boundary':4,
+                            'Expressions':4,
+                            'Domain Interface':4,
+                            'Monitor Point':6,
+                            }
         self.selected_objects = []
         
         self.gui_set_frames()
@@ -62,6 +75,7 @@ class MainApplication(tk.Frame):
                 state='readonly')
         self.cbox_object_type.bind("<<ComboboxSelected>>", self.cmd_select_object_type)
         self.cbox_object_type.set(self.object_types[0])
+        self.cbox_object_name.bind("<<ComboboxSelected>>", self.cmd_select_object_name)
    
     def gui_set_grid(self):
         self.mainframe.pack(fill='both',expand=1,padx=5,pady=5)
@@ -131,27 +145,20 @@ class MainApplication(tk.Frame):
             for line in fp:
                 self.orig_setup.append(line.rstrip())
         
-        object_dict = {'Domain':2,
-                       'Material':2,
-                       'Boundary':4,
-                       'Expressions':4,
-                       'Domain Interface':4}
-        
-        for obj in object_dict:
+        for obj in self.object_dict:
             objects_found = []
             if obj == 'Boundary':
                 for line in self.orig_setup:
-                    if (obj.upper()+':' in line and 
-                        re.search('[\s{%s}]' % object_dict[obj],line) and 
-                        ' Side ' not in line):
+                    if (obj.upper()+':' in line and ' Side ' not in line):
                         objects_found.append(line.split(':')[1].lstrip(' ').rstrip(' '))
             elif obj == 'Expressions':
+                temp_data = []
                 for idx,line in enumerate(self.orig_setup):
                     if obj.upper()+':' in line:
                         temp_data = self.orig_setup[idx:]
                         break
                 for idx,line in enumerate(temp_data):
-                    if re.search('[\s{%s}]' % object_dict[obj],line) and 'END' in line:
+                    if re.search('^\s{%s}END' % self.object_dict[obj],line):
                         temp_data = temp_data[:idx]
                         break
                 for line in temp_data:
@@ -159,10 +166,38 @@ class MainApplication(tk.Frame):
                         objects_found.append(line.split(' = ')[0].lstrip(' ').rstrip(' '))
             else:
                 for line in self.orig_setup:
-                    if (obj.upper()+':' in line and re.search('[\s{%s}]' % object_dict[obj],line)):
+                    if obj.upper()+':' in line:
                         objects_found.append(line.split(':')[1].lstrip(' ').rstrip(' '))
             self.objects[obj] = objects_found
         return
+    
+    def cmd_select_object_name(self,event):
+        self.selected_object = []
+        obj_type = self.cbox_object_type.get()
+        obj_name = self.cbox_object_name.get()
+        
+        temp_data = []
+        for idx,line in enumerate(self.orig_setup):
+            if obj_type.upper() in line and obj_name in line:
+                temp_data = self.orig_setup[idx:]
+                break
+        for idx,line in enumerate(temp_data):
+            if re.search('^\s{%s}END' % self.object_dict[obj_type],line):
+                print (line)
+                self.selected_object_data = temp_data[:idx]
+                break
+        
+        print (temp_data[0])
+        print (obj_type)
+        print (obj_name)
+        self.update_text(self.selected_object_data)
+                
+    def update_text(self,obj_data):
+        self.text_output.config(state='normal')
+        self.text_output.delete(1.0,'end')
+        for line in obj_data:
+            self.text_output.insert('end',line+'\n')
+        self.text_output.config(state='disabled')    
     
     def cmd_select_object_type(self,event):
         obj_type = self.cbox_object_type.get()
