@@ -26,7 +26,7 @@ class MainApplication(tk.Frame):
                             'Material':2,
                             'Boundary':4,
                             'Expressions':4,
-                            'Domain Interface':4,
+                            'Domain Interface':2,
                             'Monitor Point':6,
                             }
         self.selected_objects = []
@@ -141,12 +141,14 @@ class MainApplication(tk.Frame):
     def get_obj_names(self,inputfile):
         self.objects = {}
         self.orig_setup = []
+        self.expressions = {}
         with open(inputfile) as fp:
             for line in fp:
                 self.orig_setup.append(line.rstrip())
         
         for obj in self.object_dict:
             objects_found = []
+            objects_found.append('All')
             if obj == 'Boundary':
                 for line in self.orig_setup:
                     if (obj.upper()+':' in line and ' Side ' not in line):
@@ -158,7 +160,7 @@ class MainApplication(tk.Frame):
                         temp_data = self.orig_setup[idx:]
                         break
                 for idx,line in enumerate(temp_data):
-                    if re.search('^\s{%s}END' % self.object_dict[obj],line):
+                    if re.search(r'^\s{%s}END' % self.object_dict[obj],line):
                         temp_data = temp_data[:idx]
                         break
                 for line in temp_data:
@@ -173,25 +175,65 @@ class MainApplication(tk.Frame):
     
     def cmd_select_object_name(self,event):
         self.selected_object = []
+        self.selected_object_data = []
         obj_type = self.cbox_object_type.get()
         obj_name = self.cbox_object_name.get()
         
         temp_data = []
-        for idx,line in enumerate(self.orig_setup):
-            if obj_type.upper() in line and obj_name in line:
-                temp_data = self.orig_setup[idx:]
-                break
-        for idx,line in enumerate(temp_data):
-            if re.search('^\s{%s}END' % self.object_dict[obj_type],line):
-                print (line)
-                self.selected_object_data = temp_data[:idx]
-                break
         
-        print (temp_data[0])
-        print (obj_type)
-        print (obj_name)
+        if obj_type == 'Expressions':
+            for idx,line in enumerate(self.orig_setup):
+                if obj_name in line and ' = ' in line:
+                    temp_data = self.orig_setup[idx:]
+                    break
+            for idx,line in enumerate(temp_data):
+                if ' = ' in line and not re.search(r'\\$',line):
+                    self.selected_object_data = temp_data[:idx+1]
+                    break
+                elif ' = ' in line and re.search(r'\\$',line):
+                    self.selected_object_data.append(line)
+                    temp_data = temp_data[idx+1:]
+                    break
+            for line in temp_data:
+                if ' = ' in line:
+                    break
+                else:
+                    self.selected_object_data.append(line)                 
+        elif obj_name == 'All':
+            self.selected_object_data = self.get_selected_obj_data(obj_type)
+        else:
+            for idx,line in enumerate(self.orig_setup):
+                if obj_type.upper() in line and obj_name in line:
+                    temp_data = self.orig_setup[idx:]
+                    break
+            for idx,line in enumerate(temp_data):
+                if re.search(r'^\s{%s}END' % self.object_dict[obj_type],line):
+                    self.selected_object_data = temp_data[:idx+1]
+                    break
+        
         self.update_text(self.selected_object_data)
-                
+    
+    def get_selected_obj_data(self,obj_type):
+        selected = []
+        temp_data = []
+        fidx = []
+        for idx,line in enumerate(self.orig_setup):
+            if obj_type == 'Boundary':
+                if re.search(r'(%s:)' % obj_type.upper(),line) and 'Side' not in line:
+                    fidx.append(idx)
+            else:
+                if re.search(r'(%s:)' % obj_type.upper(),line):
+                    fidx.append(idx)
+                    
+        for findex in fidx:
+            temp_data = self.orig_setup[findex:]
+            for idx,line in enumerate(temp_data): 
+                if re.search(r'^\s{%s}END' % self.object_dict[obj_type],line):
+                    selected = selected + temp_data[:idx+1]
+                    break
+        return selected
+            
+            
     def update_text(self,obj_data):
         self.text_output.config(state='normal')
         self.text_output.delete(1.0,'end')
