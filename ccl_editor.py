@@ -5,7 +5,6 @@ from tkinter import filedialog
 from tkinter.font import Font
 from tkinter import messagebox
 from shutil import copyfile
-import pandas as pd
 import math
 import os
 
@@ -251,11 +250,14 @@ class MainApplication(tk.Frame):
                     break
         
         self.update_text(self.selected_object_data)
+#        self.highlight_block(obj_type,
+#                             obj_type.upper()+':',
+#                             self.object_dict[obj_type],
+#                             'red')
+
         self.highlight_block('dom','DOMAIN:',2,'red')
-        self.highlight_block('bnd','BOUNDARY:',4,'blue')
+        self.highlight_block('bnd','BOUNDARY:',4,'blue')   
         self.highlight_block('if','DOMAIN INTERFACE:',2,'green')
-        self.highlight_block('material','MATERIAL:',2,'orange')
-        
         
     def get_selected_obj_data(self,obj_type):
         selected = []
@@ -335,42 +337,58 @@ class MainApplication(tk.Frame):
  
     def highlight_block(self,tagname,string,spaces,color):
         objects_found = False
+        
         idx = '1.0'
         self.text_output.tag_remove(tagname, '1.0', 'end')
         self.text_output.tag_remove('obj_name', '1.0', 'end')
+        
+        block_fidx = []
+        block_lidx = []
+        
         while 1: 
             idx = self.text_output.search(string, idx, nocase=1, stopindex='end')
             if not idx: break
+            block_fidx.append(idx)    
             lidx = '%s+%dc' % (idx, len(string))
-            self.text_output.tag_add(tagname, idx, lidx)
             self.text_output.tag_add(
                     'obj_name',
                     lidx,
                     self.text_output.index('%d.end' % float(idx)))
             idx = lidx
             objects_found = True
-            
-        self.text_output.tag_config(
-                tagname,
-                foreground=color,
-                font='Consolas 11 bold')
-        self.text_output.tag_config(
-                'obj_name',
-                font='Consolas 11 bold')
-        
+
         if objects_found == True:
             idx = '1.0'
             self.text_output.tag_remove('end', '1.0', 'end')
             while 1: 
                 idx = self.text_output.search(r'^\s{%s}END' % spaces, idx, nocase=1, stopindex='end',regexp=True)
                 if not idx: break
+                block_lidx.append(idx)    
                 lidx = '%s+%dc' % (idx, len('END')+spaces)
-                self.text_output.tag_add('end', idx, lidx)
                 idx = lidx
             
-            self.text_output.tag_config(
-                    'end',
+        block_idx = {}
+        for fidx in block_fidx:
+            for lidx in block_lidx:
+                if float(lidx) > float(fidx):
+                    block_idx[fidx] = lidx
+                    break
+        
+        self.text_output.tag_remove(tagname, '1.0', 'end')
+        for fidx in block_idx:
+            self.text_output.tag_add(tagname, fidx, '%s+%dc' % (fidx,len(string)))
+            self.text_output.tag_add(tagname, 
+                                     block_idx[fidx],
+                                     '%s+%dc' % (block_idx[fidx],len('END')+spaces))
+            
+        self.text_output.tag_config(
+                    tagname,
                     foreground=color,
+                    font='Consolas 11 bold')
+        
+        self.text_output.tag_config(
+                    'obj_name',
+                    foreground = 'yellow',
                     font='Consolas 11 bold')
     
     def highlight_names(self,tagname,obj_type):
@@ -421,7 +439,7 @@ class MainApplication(tk.Frame):
         if self.fidx_search:
             self.text_output.yview_moveto(0)
             self.text_output.yview_scroll(self.fidx_search[self.counter]-1,'units')
-        if self.counter == len(self.fidx)-1:
+        if self.counter == len(self.fidx_search)-1:
             self.counter = 1
         else:
             self.counter += 1
