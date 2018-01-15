@@ -200,6 +200,7 @@ class MainApplication(tk.Frame):
             
     def get_obj_names(self,inputfile):
         self.objects = {}
+        self.object_types = ['All']
         self.orig_setup = []
         self.expressions = {}
         with open(inputfile) as fp:
@@ -239,6 +240,7 @@ class MainApplication(tk.Frame):
     
     def cmd_select_object_name(self,event):
         self.text_output.delete(1.0,'end')        
+        self.cbox_object_name.config(state='readonly')
         self.selected_object = []
         self.selected_object_data = []
         obj_type = self.cbox_object_type.get()
@@ -284,7 +286,7 @@ class MainApplication(tk.Frame):
                         else:
                             self.selected_object_data.append(line)                 
         elif obj_name == 'All':
-            self.selected_object_data = self.get_selected_obj_data(obj_type)
+            self.selected_object_data = self.get_selected_obj_data(obj_type)    
         else:
             for idx,line in enumerate(self.orig_setup):
                 if obj_type.upper() in line and obj_name in line:
@@ -298,14 +300,20 @@ class MainApplication(tk.Frame):
                     break
         
         self.update_text(self.selected_object_data)
-        self.highlight_block(obj_type,
-                             obj_type.upper()+':',
-                             self.object_dict[obj_type],
-                             'red')
+        
+#        self.highlight_block(obj_type,
+#                             obj_type.upper()+':',
+#                             self.object_dict[obj_type],
+#                             'red')
 
-        self.highlight_block('dom','DOMAIN:',2,'red')
-        self.highlight_block('bnd','BOUNDARY:',4,'blue')   
-        self.highlight_block('if','DOMAIN INTERFACE:',2,'green')
+#        self.highlight_block('dom','DOMAIN:',2,'red')
+#        self.highlight_block('bnd','BOUNDARY:',4,'blue')   
+#        self.highlight_block('if','DOMAIN INTERFACE:',2,'green')
+        blk_indices = self.get_indices('Domain')
+        self.highlight_names_2('Domain',blk_indices,'red')
+        blk_indices = self.get_indices('Boundary')
+        self.highlight_names_2('Boundary',blk_indices,'blue')
+
         
     def get_selected_obj_data(self,obj_type):
         selected = []
@@ -336,14 +344,22 @@ class MainApplication(tk.Frame):
         self.text_output.delete(1.0,'end')
         for line in obj_data:
             self.text_output.insert('end',line+'\n')
+        self.selected_object_data = obj_data
     
     def cmd_select_object_type(self,event):
         self.text_output.delete(1.0,'end')
-        
         obj_type = self.cbox_object_type.get()
-        self.cbox_object_name.config(values=self.objects[obj_type])
-        self.cbox_object_name.set(self.objects[obj_type][0])
-        
+        if obj_type == 'All':
+            self.cbox_object_name.config(state='disabled')
+            self.update_text(self.new_setup)
+#            self.highlight_block('dom','DOMAIN:',2,'red')
+#            self.highlight_block('bnd','BOUNDARY:',4,'blue')   
+#            self.highlight_block('if','DOMAIN INTERFACE:',2,'green')
+#            self.highlight_names_2()
+        else:
+            self.cbox_object_name.config(state='readonly')
+            self.cbox_object_name.config(values=self.objects[obj_type])
+            self.cbox_object_name.set(self.objects[obj_type][0])
     
     def cmd_escape(self,event):
         self.checkbutton_replace.deselect()
@@ -437,21 +453,74 @@ class MainApplication(tk.Frame):
                     foreground = 'yellow',
                     font='Consolas 11 bold')
     
-    def highlight_names(self,tagname,obj_type):
-        self.text_output.tag_remove(tagname, '1.0', 'end')
-        for name in self.objects[obj_type]:
-            idx = '1.0'
-            while 1: 
-                idx = self.text_output.search(': '+name, idx, nocase=1, stopindex='end')
-                if not idx: break
-                lidx = '%s+%dc' % (idx, len(name)+2)
-                self.text_output.tag_add(tagname, idx, lidx)
-                idx = lidx
+    def highlight_names(self):
+        self.text_output.tag_remove('objname', '1.0', 'end')
+        for obj_type in self.object_types:
+            if obj_type != 'All':
+                for name in self.objects[obj_type]:
+                    idx = '1.0'
+                    while 1: 
+                        idx = self.text_output.search(': '+name, idx, nocase=1, stopindex='end')
+                        if not idx: break
+                        lidx = '%s+%dc' % (idx, len(name)+2)
+                        self.text_output.tag_add('objname', idx, lidx)
+                        idx = lidx
             
         self.text_output.tag_config(
-                tagname,
+                'objname',
+                foreground='black',
                 font='Consolas 11 bold')
+     
+    def highlight_names_2(self,tag,blk_idx,color):
+        self.text_output.tag_remove(tag+'type', '1.0', 'end')
+        self.text_output.tag_remove(tag+'name', '1.0', 'end')
+        self.text_output.tag_remove(tag+'end', '1.0', 'end')
         
+        for fx in blk_idx:
+            fidx_type = '%d.0' % (fx+1) 
+            lidx_type = self.text_output.search(':', fidx_type)
+            fidx_name = self.text_output.search(':', fidx_type)
+            fidx_name = fidx_name+'+1c'
+            lidx_name = '%d.end' % (fx+1)
+            self.text_output.tag_add(tag+'type', fidx_type, lidx_type)
+            self.text_output.tag_add(tag+'name', fidx_name, lidx_name)
+            
+            fidx_end = '%d.0' % (blk_idx[fx]+1)
+            lidx_end = '%d.end' % (blk_idx[fx]+1)
+            self.text_output.tag_add(tag+'end', fidx_end, lidx_end)
+               
+        self.text_output.tag_config(
+                        tag+'type',
+                        foreground=color,
+                        font='Consolas 11 bold')
+        self.text_output.tag_config(
+                        tag+'name',
+                        foreground='black',
+                        font='Consolas 11 bold')
+        self.text_output.tag_config(
+                        tag+'end',
+                        foreground=color,
+                        font='Consolas 11 bold')
+        
+        
+    def get_indices(self,obj_type):
+        blk_idx = {}
+        fidx = []
+        lidx = []
+        for idx,line in enumerate(self.selected_object_data):
+            space = len(line) - len(line.lstrip())
+            if obj_type.upper()+':' in line: 
+                fidx.append(idx)
+            if 'END' in line and space == self.object_dict[obj_type]:
+                lidx.append(idx)
+                
+        for fx in fidx:
+            for lx in lidx:
+                if lx > fx:
+                    blk_idx[fx] = lx
+                    break
+        return blk_idx
+    
     def search_text(self,event):
         if event.keysym != 'Return':
             self.counter = 1
