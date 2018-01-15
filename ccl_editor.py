@@ -4,6 +4,8 @@ from tkinter import ttk
 from tkinter import filedialog
 from tkinter.font import Font
 from tkinter import messagebox
+from tkinter import simpledialog
+import shutil
 from shutil import copyfile
 import math
 import os
@@ -43,8 +45,7 @@ class MainApplication(tk.Frame):
                 height=20,
                 width=80,
                 wrap='none',
-                font='Consolas 11',
-                state='disabled')
+                font='Consolas 11')
         self.text_xscrollbar = tk.Scrollbar(self.mainframe)
         self.text_xscrollbar.config(command=self.text_output.xview,orient='horizontal')
         self.text_output.config(xscrollcommand=self.text_xscrollbar.set)
@@ -106,15 +107,17 @@ class MainApplication(tk.Frame):
         self.menubar.add_cascade(label='File',menu=self.filemenu)
         
         self.savemenu = tk.Menu(self.filemenu,tearoff=0)
-        self.savemenu.add_command(label='Save .ccl')
-        self.savemenu.add_command(label='Save .def')
-        self.savemenu.add_command(label='Replace .def')
+        self.savemenu.add_command(label='Save .ccl',command=self.cmd_save_ccl)
+        self.savemenu.add_command(label='Save .def',command=self.cmd_copy_def)
+        self.savemenu.add_command(label='Replace .def',command=self.cmd_overwrite_def)
         self.filemenu.add_cascade(label='Save',menu=self.savemenu)
         
         self.editmenu = tk.Menu(self.menubar,tearoff=0)
         self.editmenu.add_command(label='Search', command=self.cmd_search,accelerator="Ctrl+F")
-        self.editmenu.add_command(label='Search and Replace', command=self.cmd_open_file)
         self.menubar.add_cascade(label='Edit',menu=self.editmenu)
+        
+        self.filemenu.entryconfig('Save',state='disabled')
+        self.menubar.entryconfig('Edit',state='disabled')
                     
     def cmd_open_file(self):
         temp = tk.filedialog.askopenfilename(
@@ -132,10 +135,58 @@ class MainApplication(tk.Frame):
             self.inputfile_type = os.path.splitext(self.inputfile_fullpath)[1]
             
             self.get_obj_data()
-            
+            self.filemenu.entryconfig('Save',state='normal')
+            self.menubar.entryconfig('Edit',state='normal')
         else:
             return
                
+    def cmd_save_ccl(self):
+        self.outputfile = filedialog.asksaveasfilename(parent=self.master,
+                                    initialdir=self.inputfile_dir_name,
+                                    title="Selet a file for export",
+                                    filetypes=[('All files', '.*')]) 
+    
+        if self.outputfile:
+            file = open(self.outputfile,'w')
+            for line in self.new_setup:
+                file.write('%s\n' % line)
+            file.close()
+        else:
+            return
+    
+    def cmd_overwrite_def(self):
+        result = tk.messagebox.askokcancel('Warning','This will overwrite the original .def file!\nMake sure your modifications are consistent!')
+        
+        if self.inputfile_fullpath and result == 'yes':
+            file = open('temp.ccl','w')
+            for line in self.new_setup:
+                file.write('%s\n' % line)
+            file.close()
+                
+            os.system('cfx5cmds -write -definition %s -text %s' % (self.inputfile_fullpath,'temp.ccl'))
+            os.remove('temp.ccl')
+        else:
+            return
+        
+    def cmd_copy_def(self):
+        self.outputfile = filedialog.asksaveasfilename(parent=self.master,
+                                    initialdir=self.inputfile_dir_name,
+                                    title="Selet a .def file to overwrite",
+                                    filetypes=[('Solver input files', '*.def'),
+                                               ('All files', '.*')]) 
+
+        if self.outputfile:
+            file = open('temp.ccl','w')
+            for line in self.new_setup:
+                file.write('%s\n' % line)
+            file.close()
+            
+            shutil.copyfile(self.inputfile_fullpath,self.outputfile)
+            os.system('cfx5cmds -write -def %s -ccl %s' % (self.outputfile,'temp.ccl'))
+            os.remove('temp.ccl')
+        else:
+            return
+    
     def get_obj_data(self):
         self.cbox_object_name.config(state='readonly')
         self.cbox_object_type.config(state='readonly')
@@ -154,7 +205,7 @@ class MainApplication(tk.Frame):
         with open(inputfile) as fp:
             for line in fp:
                 self.orig_setup.append(line.rstrip())
-        
+        self.new_setup = self.orig_setup
         for obj in self.object_dict:
             objects_found = []
             objects_found.append('All')
@@ -187,10 +238,7 @@ class MainApplication(tk.Frame):
         return
     
     def cmd_select_object_name(self,event):
-        self.text_output.config(state='normal')
-        self.text_output.delete(1.0,'end')
-        self.text_output.config(state='disabled')
-        
+        self.text_output.delete(1.0,'end')        
         self.selected_object = []
         self.selected_object_data = []
         obj_type = self.cbox_object_type.get()
@@ -250,10 +298,10 @@ class MainApplication(tk.Frame):
                     break
         
         self.update_text(self.selected_object_data)
-#        self.highlight_block(obj_type,
-#                             obj_type.upper()+':',
-#                             self.object_dict[obj_type],
-#                             'red')
+        self.highlight_block(obj_type,
+                             obj_type.upper()+':',
+                             self.object_dict[obj_type],
+                             'red')
 
         self.highlight_block('dom','DOMAIN:',2,'red')
         self.highlight_block('bnd','BOUNDARY:',4,'blue')   
@@ -285,16 +333,12 @@ class MainApplication(tk.Frame):
             
             
     def update_text(self,obj_data):
-        self.text_output.config(state='normal')
         self.text_output.delete(1.0,'end')
         for line in obj_data:
             self.text_output.insert('end',line+'\n')
-        self.text_output.config(state='disabled')    
     
     def cmd_select_object_type(self,event):
-        self.text_output.config(state='normal')
         self.text_output.delete(1.0,'end')
-        self.text_output.config(state='disabled')
         
         obj_type = self.cbox_object_type.get()
         self.cbox_object_name.config(values=self.objects[obj_type])
@@ -331,8 +375,10 @@ class MainApplication(tk.Frame):
             if str_old in line:
                 data_new[idx] = line.replace(str_old,str_new)
         
-        new_setup = self.orig_setup
-        new_setup[self.fidx:self.lidx] = data_new
+        self.new_setup = self.orig_setup
+        self.new_setup[self.fidx:self.lidx] = data_new
+        
+        self.update_text(data_new)
         return
  
     def highlight_block(self,tagname,string,spaces,color):
