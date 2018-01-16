@@ -301,18 +301,10 @@ class MainApplication(tk.Frame):
         
         self.update_text(self.selected_object_data)
         
-#        self.highlight_block(obj_type,
-#                             obj_type.upper()+':',
-#                             self.object_dict[obj_type],
-#                             'red')
-
-#        self.highlight_block('dom','DOMAIN:',2,'red')
-#        self.highlight_block('bnd','BOUNDARY:',4,'blue')   
-#        self.highlight_block('if','DOMAIN INTERFACE:',2,'green')
         blk_indices = self.get_indices('Domain')
-        self.highlight_names_2('Domain',blk_indices,'red')
+        self.syntax_highlight('Domain',blk_indices,'red')
         blk_indices = self.get_indices('Boundary')
-        self.highlight_names_2('Boundary',blk_indices,'blue')
+        self.syntax_highlight('Boundary',blk_indices,'blue')
 
         
     def get_selected_obj_data(self,obj_type):
@@ -352,10 +344,6 @@ class MainApplication(tk.Frame):
         if obj_type == 'All':
             self.cbox_object_name.config(state='disabled')
             self.update_text(self.new_setup)
-#            self.highlight_block('dom','DOMAIN:',2,'red')
-#            self.highlight_block('bnd','BOUNDARY:',4,'blue')   
-#            self.highlight_block('if','DOMAIN INTERFACE:',2,'green')
-#            self.highlight_names_2()
         else:
             self.cbox_object_name.config(state='readonly')
             self.cbox_object_name.config(values=self.objects[obj_type])
@@ -396,82 +384,8 @@ class MainApplication(tk.Frame):
         
         self.update_text(data_new)
         return
- 
-    def highlight_block(self,tagname,string,spaces,color):
-        objects_found = False
-        
-        idx = '1.0'
-        self.text_output.tag_remove(tagname, '1.0', 'end')
-        self.text_output.tag_remove('obj_name', '1.0', 'end')
-        
-        block_fidx = []
-        block_lidx = []
-        
-        while 1: 
-            idx = self.text_output.search(string, idx, nocase=1, stopindex='end')
-            if not idx: break
-            block_fidx.append(idx)    
-            lidx = '%s+%dc' % (idx, len(string))
-            self.text_output.tag_add(
-                    'obj_name',
-                    lidx,
-                    self.text_output.index('%d.end' % float(idx)))
-            idx = lidx
-            objects_found = True
-
-        if objects_found == True:
-            idx = '1.0'
-            self.text_output.tag_remove('end', '1.0', 'end')
-            while 1: 
-                idx = self.text_output.search(r'^\s{%s}END' % spaces, idx, nocase=1, stopindex='end',regexp=True)
-                if not idx: break
-                block_lidx.append(idx)    
-                lidx = '%s+%dc' % (idx, len('END')+spaces)
-                idx = lidx
-            
-        block_idx = {}
-        for fidx in block_fidx:
-            for lidx in block_lidx:
-                if float(lidx) > float(fidx):
-                    block_idx[fidx] = lidx
-                    break
-        
-        self.text_output.tag_remove(tagname, '1.0', 'end')
-        for fidx in block_idx:
-            self.text_output.tag_add(tagname, fidx, '%s+%dc' % (fidx,len(string)))
-            self.text_output.tag_add(tagname, 
-                                     block_idx[fidx],
-                                     '%s+%dc' % (block_idx[fidx],len('END')+spaces))
-            
-        self.text_output.tag_config(
-                    tagname,
-                    foreground=color,
-                    font='Consolas 11 bold')
-        
-        self.text_output.tag_config(
-                    'obj_name',
-                    foreground = 'yellow',
-                    font='Consolas 11 bold')
-    
-    def highlight_names(self):
-        self.text_output.tag_remove('objname', '1.0', 'end')
-        for obj_type in self.object_types:
-            if obj_type != 'All':
-                for name in self.objects[obj_type]:
-                    idx = '1.0'
-                    while 1: 
-                        idx = self.text_output.search(': '+name, idx, nocase=1, stopindex='end')
-                        if not idx: break
-                        lidx = '%s+%dc' % (idx, len(name)+2)
-                        self.text_output.tag_add('objname', idx, lidx)
-                        idx = lidx
-            
-        self.text_output.tag_config(
-                'objname',
-                foreground='black',
-                font='Consolas 11 bold')
-     
-    def highlight_names_2(self,tag,blk_idx,color):
+   
+    def syntax_highlight(self,tag,blk_idx,color):
         self.text_output.tag_remove(tag+'type', '1.0', 'end')
         self.text_output.tag_remove(tag+'name', '1.0', 'end')
         self.text_output.tag_remove(tag+'end', '1.0', 'end')
